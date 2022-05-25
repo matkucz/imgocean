@@ -1,13 +1,14 @@
 from django.http import Http404, FileResponse, HttpResponse
 from django.conf import settings
-from PIL import Image as PILImage
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .const import EXTENSION_MAPPER
 from .models import Image, Size
-from .serializers import ImageUploadSerializer, SignupSerializer
+from .serializers import (
+    ImageDetailSerializer, ImageUploadSerializer, SignupSerializer
+)
 
 class SignupView(APIView):
     """
@@ -30,62 +31,43 @@ class SignupView(APIView):
 class ImageUploadView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def __get_image_urls(self, image, user):
+        sizes = Size.objects.filter(account_type=user.account_type)
+        urls = {}
+        for size in sizes:
+            link = f"/api/images/{image.name}"
+            if size.height != 0:
+                urls[f'th_{size.height}_px'] = f"{link}?size={size.height}"
+            else:
+                urls[f'original'] = link
+        return urls
+
+
     def get(self, request, format=None):
         images = Image.objects.filter(owner=request.user)
         sizes = Size.objects.filter(account_type=request.user.account_type)
-        images_list = []
-        for image in images:
-            for size in sizes:
-                link = f"/api/images/{image.name}"
-                # original image have height 0
-                if size.height != 0:
-                    link = f"{link}?size={size.height}"
-                images_list.append(link)
+        images_list = [
+            self.__get_image_urls(image, request.user)
+            for image in images
+        ]   
         return Response(images_list, status=status.HTTP_200_OK)
         
     def post(self, request, format=None):
         serializer = ImageUploadSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(owner=request.user)
-            return Response({"message": "ok"}, status=status.HTTP_201_CREATED)
+            image = serializer.save(owner=request.user)
+            images = self.__get_image_urls(image, request.user)
+            return Response(images, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 
-class ImageDetailView(APIView):
-    # permission_classes = []
-
-    def get_object(self, filename):
-        try:
-            return Image.objects.get(name=filename)
-        except Image.DoesNotExist:
-            raise Http404
-    
-    def get_size_object(self, image, size):
-        try:
-            Size.objects.get(
-                account_type=image.owner.account_type,
-                height=size
-            )
-        except Size.DoesNotExist:
-            raise Http404
-    
+class ImageDetailView(APIView):    
     def get(self, request, filename, format=None):
-        image = self.get_object(filename)
-        size = request.query_params.get('size')
-        if size is None:
-            size = 0
-        size = int(size)
-        self.get_size_object(
-            image, size
-        )
-        with PILImage.open(settings.IMAGE_ROOT / '' / filename) as img:
-            response_img = img
-            file_format = response_img.format
-            if size != 0:
-                widht, height = response_img.size
-                aspect_ratio = widht / height
-                new_width = int(aspect_ratio * size)
-                response_img = response_img.resize((new_width, size))
+        query_serializer = ImageDetailSerializer(data=request.query_params)
+        if query_serializer.is_valid():
+            query_serializer.validate_size(query_serializer.data)
+            response_img, file_format = query_serializer.create(filename)
             response = HttpResponse(content_type=EXTENSION_MAPPER[file_format.lower()])
-            response_img.save(response, file_format)
+            response_img.save(response, file_format)  
             return response
+        return Response(query_serializer.errors,status=status.HTTP_400_BAD_REQUEST)
