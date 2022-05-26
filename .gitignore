@@ -159,6 +159,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-imgocean/images/*.jpg
-imgocean/images/*.png
-imgocean/images/*.jpeg
+# Project files
+imgocean/images
+run_docker.sh

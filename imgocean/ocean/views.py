@@ -34,13 +34,12 @@ class ImageUploadView(APIView):
         sizes = Size.objects.filter(account_type=user.account_type)
         urls = {}
         for size in sizes:
-            link = f"/api/images/{image.name}"
+            link = f"/api/images/{image.img.name}"
             if size.height != 0:
                 urls[f'th_{size.height}_px'] = f"{link}?size={size.height}"
             else:
                 urls[f'original'] = link
         return urls
-
 
     def get(self, request, format=None):
         images = Image.objects.filter(owner=request.user)
@@ -65,7 +64,7 @@ class ImageDetailView(APIView):
         query_serializer = ImageDetailSerializer(data=request.query_params)
         if query_serializer.is_valid():
             query_serializer.validate_size(query_serializer.data)
-            response_img, file_format = query_serializer.create(filename)
+            response_img, file_format = query_serializer.create(filename, request.user)
             response = HttpResponse(content_type=EXTENSION_MAPPER[file_format.lower()])
             response_img.save(response, file_format)  
             return response

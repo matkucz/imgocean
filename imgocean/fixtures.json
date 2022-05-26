@@ -4,7 +4,8 @@
   "pk": 1,
   "fields": {
     "name": "Basic",
-    "description": ""
+    "description": "",
+    "can_generate_exp_links": false
   }
 },
 {
@@ -12,7 +13,8 @@
   "pk": 2,
   "fields": {
     "name": "Premium",
-    "description": ""
+    "description": "",
+    "can_generate_exp_links": false
   }
 },
 {
@@ -20,7 +22,8 @@
   "pk": 3,
   "fields": {
     "name": "Enterprise",
-    "description": ""
+    "description": "",
+    "can_generate_exp_links": true
   }
 },
 {

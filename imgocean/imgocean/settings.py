@@ -149,4 +149,4 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
 }
 
-IMAGE_ROOT = BASE_DIR / 'images/'
+MEDIA_ROOT = 'images/'

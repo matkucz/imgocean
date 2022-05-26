@@ -1,9 +1,10 @@
+from datetime import timedelta
 from uuid import uuid4
 from PIL import Image as PImage
 from django.conf import settings
 from django.http import Http404
+from django.utils import timezone
 from rest_framework import serializers
-from .const import CONTENT_TYPE_MAPPER
 from .models import Image, User, Size
 
 
@@ -33,34 +34,28 @@ class SignupSerializer(serializers.ModelSerializer):
 
 class ImageUploadSerializer(serializers.Serializer):
     img = serializers.ImageField(max_length=50, allow_empty_file=False)
-    exp_after = serializers.IntegerField(min_value=300, max_value=30000)
-
-    def __generate_filename(self, content_type:str) -> str:
-        file_extension = CONTENT_TYPE_MAPPER[content_type]
-        return f'{uuid4()}.{file_extension}'
-    
-    def __save_image(self, img, filename):        
-        try:
-            with open(settings.IMAGE_ROOT / '' / filename, 'wb') as file:
-                file.write(img.getbuffer())
-        except FileNotFoundError:
-            pass
+    exp_after = serializers.IntegerField(
+        min_value=300,
+        max_value=30000,
+        required=False
+    )
         
     def create(self, validated_data):
         owner = validated_data['owner']
-        img = getattr(validated_data['img'], 'file')
-        content_type = getattr(validated_data['img'], 'content_type')
-        filename = self.__generate_filename(content_type)
-        self.__save_image(img, filename)
-        return Image.objects.create(owner=owner, name=filename)
+        img = validated_data['img']
+        exp_after = validated_data.get('exp_after', None)
+        if exp_after and not owner.account_type.can_generate_exp_links:
+            raise serializers.ValidationError({'exp_after': ['You dont\'t have permissions to create expiring links.']})
+        exp_after = timezone.now() + timedelta(seconds=exp_after) if exp_after else None
+        return Image.objects.create(owner=owner, img=img, exp_after=exp_after)
 
 
 class ImageDetailSerializer(serializers.Serializer):
-    size = serializers.IntegerField(min_value=0, required=False, allow_null=False)
+    size = serializers.IntegerField(min_value=0, required=False)
 
     def __get_image_object(self, filename):
         try:
-            return Image.objects.get(name=filename)
+            return Image.objects.get(img=filename)
         except Image.DoesNotExist:
             raise Http404
     
@@ -72,7 +67,14 @@ class ImageDetailSerializer(serializers.Serializer):
             )
         except Size.DoesNotExist:
             raise Http404
-    
+
+    def __check_expired_permissions(self, image, user):
+        if image.exp_after is None \
+            or image.exp_after >= timezone.now() \
+                or (not user.is_anonymous and image.owner == user):
+            return True
+        raise Http404('Link expired')
+
     def validate_size(self, value):
         """
         Check if there is empty `size` parameter in query.
@@ -81,7 +83,7 @@ class ImageDetailSerializer(serializers.Serializer):
             raise serializers.ValidationError({'size': ['Empty size query.']})
         return value
 
-    def create(self, filename):
+    def create(self, filename, user):
         """
         Create response image.
         """
@@ -90,7 +92,8 @@ class ImageDetailSerializer(serializers.Serializer):
         self.__check_size_exist(
             image_record, size
         )
-        with PImage.open(settings.IMAGE_ROOT / '' / filename) as img:
+        self.__check_expired_permissions(image_record, user)
+        with PImage.open(image_record.img) as img:
             response_img = img
             file_format = response_img.format
             if size:
