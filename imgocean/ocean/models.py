@@ -11,17 +11,18 @@ from django.contrib.auth.models import AbstractUser
 
 def validate_exp_after(value):
     now = timezone.now()
-    min_value = now + datetime.timedelta(seconds=300)
-    max_value = now + datetime.timedelta(seconds=30000)
+    min_value = now + timedelta(seconds=299)
+    max_value = now + timedelta(seconds=29999)
     if not (min_value <= value <= max_value):
         raise ValidationError("Expiration seconds should be between 300 and 30000.")
+    return value
 
 def upload_to(instance, filename):
     _, extension = os.path.splitext(filename)
     return f'{uuid4()}{extension}'
 
 class Account(models.Model):
-    name = models.CharField(max_length=20)
+    name = models.CharField(max_length=20, unique=True)
     description = models.TextField()
     can_generate_exp_links = models.BooleanField(
         null=False,
@@ -68,6 +69,11 @@ class Image(models.Model):
 class Size(models.Model):
     account_type = models.ForeignKey(Account, on_delete=models.CASCADE)
     height = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = [
+            ['account_type', 'height']
+        ]
 
     def __str__(self) -> str:
         return f"{self.height}"

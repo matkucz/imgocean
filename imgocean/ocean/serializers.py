@@ -4,6 +4,7 @@ from PIL import Image as PImage
 from django.conf import settings
 from django.http import Http404
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from rest_framework import serializers
 from .models import Image, User, Size
 
@@ -47,7 +48,10 @@ class ImageUploadSerializer(serializers.Serializer):
         if exp_after and not owner.account_type.can_generate_exp_links:
             raise serializers.ValidationError({'exp_after': ['You dont\'t have permissions to create expiring links.']})
         exp_after = timezone.now() + timedelta(seconds=exp_after) if exp_after else None
-        return Image.objects.create(owner=owner, img=img, exp_after=exp_after)
+        image = Image(owner=owner, img=img, exp_after=exp_after)
+        image.full_clean()
+        image.save()
+        return image
 
 
 class ImageDetailSerializer(serializers.Serializer):
@@ -57,7 +61,7 @@ class ImageDetailSerializer(serializers.Serializer):
         try:
             return Image.objects.get(img=filename)
         except Image.DoesNotExist:
-            raise Http404
+            raise Http404('Image doesn\'t exist')
     
     def __check_size_exist(self, image, size):
         try:
@@ -66,7 +70,7 @@ class ImageDetailSerializer(serializers.Serializer):
                 height=size
             )
         except Size.DoesNotExist:
-            raise Http404
+            raise Http404('Image doesn\'t exist')
 
     def __check_expired_permissions(self, image, user):
         if image.exp_after is None \

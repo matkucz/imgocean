@@ -1,4 +1,5 @@
 from django.http import HttpResponse
+from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -53,9 +54,12 @@ class ImageUploadView(APIView):
     def post(self, request, format=None):
         serializer = ImageUploadSerializer(data=request.data)
         if serializer.is_valid():
-            image = serializer.save(owner=request.user)
-            images = self.__get_image_urls(image, request.user)
-            return Response(images, status=status.HTTP_201_CREATED)
+            try:
+                image = serializer.save(owner=request.user)
+                images = self.__get_image_urls(image, request.user)
+                return Response(images, status=status.HTTP_201_CREATED)
+            except ValidationError as e:
+                return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 
@@ -64,8 +68,11 @@ class ImageDetailView(APIView):
         query_serializer = ImageDetailSerializer(data=request.query_params)
         if query_serializer.is_valid():
             query_serializer.validate_size(query_serializer.data)
-            response_img, file_format = query_serializer.create(filename, request.user)
-            response = HttpResponse(content_type=EXTENSION_MAPPER[file_format.lower()])
-            response_img.save(response, file_format)  
-            return response
-        return Response(query_serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+            try:
+                response_img, file_format = query_serializer.create(filename, request.user)
+                response = HttpResponse(content_type=EXTENSION_MAPPER[file_format.lower()])
+                response_img.save(response, file_format)  
+                return response
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(query_serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -5,8 +5,6 @@ services:
     build:
       dockerfile: Dockerfile.dev
       context: ./imgocean
-    volumes:
-      - ./imgocean/:/usr/src/app/
     ports:
       - 8000:8000
     environment:

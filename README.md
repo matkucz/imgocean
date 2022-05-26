@@ -18,6 +18,15 @@ export SECRET_KEY=`python3 -c "import secrets;print(secrets.token_urlsafe())"`
 Project generates admin account with password given in env variable.
 
 ## Run docker compose command
+### Run version without volumes:
+```
+docker compose up
+```
+Or using docker-compose-plugin:
+```
+docker compose up
+```
+### Or run dev version (with volumes):
 ```
 docker compose -f docker-compose.dev.yml up
 ```

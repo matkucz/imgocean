@@ -162,3 +162,4 @@ cython_debug/
 # Project files
 imgocean/images
 run_docker.sh
+.vscode/
