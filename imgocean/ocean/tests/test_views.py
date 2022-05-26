@@ -168,15 +168,6 @@ class ImageTestCase(TestCase):
         force_authenticate(request, user=self.basic_user)
         response = ImageUploadView.as_view()(request)
         self.assertEqual(response.status_code, 201)
-
-    def test_post_and_get_images(self):
-        pass
-
-    def test_invalid_image(self):
-        pass
-
-    def test_post_exp_image(self):
-        pass
     
     def test_get_image_wrong_size(self):
         request = self.factory.post(
@@ -228,6 +219,3 @@ class ImageTestCase(TestCase):
         )
         img_response = ImageUploadView.as_view()(image_request)
         self.assertEqual(img_response.status_code, 401)
-
-    def test_get_exp_image(self):
-        pass
